@@ -209,29 +209,20 @@ body{font-family:-apple-system,'PingFang SC','Helvetica Neue',Arial,sans-serif;b
 </div>
 
 <div id="panel-geo" class="chart-panel">
-  <div class="grid2">
-    <div class="chart-card">
-      <div class="chart-title">🏙️ 地理分布（柱状图高度 + 颜色深度）</div>
-      <div class="chart-sub">颜色越深=金额越高 | 柱越高=金额越大</div>
-      <div class="chart-box" id="c-geo-map" style="height:360px"></div>
-      <div class="insight">
-        <div class="insight-title">🗺️ 3D地理分布洞察</div>
-        <div class="insight-item"><strong>京津冀、长三角双核驱动：</strong>北京、上海、浙江三地3D柱体明显最高，占全国消费总量超70%</div>
-        <div class="insight-item"><strong>西部省份渗透率低：</strong>西藏、青海、新疆柱体几乎不可见，说明西部地区员工规模小或福利使用率低</div>
-        <div class="insight-item"><strong>中部地区均匀分布：</strong>河北、湖北、四川等省份有稳定消费，但总量不大，属于长尾覆盖</div>
-      </div>
+  <div class="chart-card" style="padding-bottom:8px">
+    <div class="chart-title">🏙️ 各省消费金额分布</div>
+    <div class="chart-sub">颜色越深=金额越高 | 滚轮缩放 · 拖拽平移 · Hover 查看详情</div>
+    <div class="chart-box" id="c-geo-map" style="height:420px"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding:0 4px">
+      <div style="font-size:11px;color:#5c6070">单位：万元</div>
+      <div id="geo-legend" style="display:flex;align-items:center;gap:6px;font-size:11px;color:#8b8fa3"></div>
     </div>
-    <div class="chart-card">
-      <div class="chart-title">🌡️ 热力散点图</div>
-      <div class="chart-sub">气泡越大=金额越高 | 颜色=强度</div>
-      <div class="chart-box" id="c-geo-scatter" style="height:360px"></div>
-      <div class="insight">
-        <div class="insight-title">🔥 热力散点洞察</div>
-        <div class="insight-item"><strong>北京热力最强：</strong>气泡最大且颜色最深，代表消费密度最高的区域，是福利覆盖的核心阵地</div>
-        <div class="insight-item"><strong>沿海经济带：</strong>上海-浙江-江苏形成连续热力带，说明长三角经济带员工到店消费活跃</div>
-        <div class="insight-item"><strong>非经济带机遇：</strong>海南、宁夏单均价排名靠前，说明偏远省份虽频次低、但单笔消费意愿强，有拓展空间</div>
-      </div>
-    </div>
+  </div>
+  <div class="insight" style="margin-top:4px">
+    <div class="insight-title">🗺️ 省份分布洞察</div>
+    <div class="insight-item"><strong>京津冀、长三角双核驱动：</strong>北京、上海、浙江颜色最深，合计占全国消费总量超70%</div>
+    <div class="insight-item"><strong>中部地区均匀分布：</strong>河北、四川、湖北等省份有稳定消费，但总量不大，属于长尾覆盖</div>
+    <div class="insight-item"><strong>西部省份渗透率低：</strong>西藏、青海、新疆颜色极浅，说明西部地区员工规模小或福利使用率低</div>
   </div>
 </div>
 
@@ -393,7 +384,6 @@ let geoDataMap = {}; // name -> [lng, lat]
 function initGeoCharts() {
   if (!geoLoaded) return;
   geoBar3D('c-geo-map', PROV_FULL);
-  geoScatter('c-geo-scatter', PROV_FULL);
 }
 
 function geoBar3D(id, data) {
@@ -401,65 +391,59 @@ function geoBar3D(id, data) {
   const chart = echarts.init(el);
 
   const maxVal = Math.max(...data.map(d => d.value));
-
-  // 用圆形气泡大小+颜色深度双重表达金额，替代3D柱
-  const scatterData = data.map(d => {
-    const coord = geoDataMap[d.name] || [116.4, 39.9];
-    const r = maxVal > 0 ? 6 + (d.value / maxVal) * 40 : 4;
-    return {
-      name: d.name,
-      value: [...coord, r],
-      value2: d.value,
-      itemStyle: { color: colorByValue(d.value, maxVal, 0.9) }
-    };
-  });
+  const minVal = Math.min(...data.map(d => d.value));
 
   const opt = {
     backgroundColor: 'transparent',
-    geo: {
-      map: 'china',
-      roam: false,
-      silent: true,
-      itemStyle: { areaColor: '#1a2030', borderColor: '#2a3050', borderWidth: 0.8 },
-      emphasis: { itemStyle: { areaColor: '#232840' } },
-      label: { show: false },
-      layoutCenter: ['50%', '50%'],
-      layoutSize: '160%'
-    },
-    series: [{
-      type: 'effectScatter',
-      coordinateSystem: 'geo',
-      data: scatterData,
-      symbolSize: function(val) { return val[2]; },
-      rippleEffect: { brushType: 'stroke', scale: 2.5 },
-      itemStyle: { color: '#3b6ddc', opacity: 0.9 },
-      label: {
-        show: true,
-        position: 'top',
-        distance: 4,
-        formatter: function(p) {
-          if (p.data.value2 < maxVal * 0.05) return '';
-          return p.data.name;
-        },
-        color: '#8b8fa3', fontSize: 10
-      }
-    }],
     tooltip: {
+      trigger: 'item',
       backgroundColor: BG,
       borderColor: GRID,
       textStyle: { color: '#e8eaed', fontSize: 12 },
       formatter: function(p) {
-        const name = p.data.name;
-        const val = data.find(d => d.name === name);
-        return name + '<br/>消费总额：<b>' + (val ? val.value.toFixed(2) : '0.00') + '万元</b>';
+        if (!p.data || p.data.value === undefined) return '';
+        return '<b>' + p.name + '</b><br/>消费总额：<b style="color:#5B8FF9">' + p.data.value.toFixed(2) + '万元</b>';
       }
     },
     visualMap: {
-      show: false,
+      show: true,
       min: 0,
-      max: maxVal,
-      inRange: { color: ['#1a3a8f', '#3b6ddc', '#7BA3FF', '#f0f4ff'] }
-    }
+      max: Math.max(maxVal, 1),
+      text: [maxVal.toFixed(0) + '万', '0'],
+      textStyle: { color: '#8b8fa3', fontSize: 10 },
+      realtime: false,
+      calculable: false,
+      inRange: {
+        color: ['#1e2030', '#1a3a8f', '#3b6ddc', '#5B8FF9', '#7BA3FF']
+      },
+      right: 16,
+      top: 'middle',
+      itemHeight: 160,
+      itemWidth: 12
+    },
+    series: [{
+      name: '消费总额',
+      type: 'map',
+      map: 'china',
+      roam: true,
+      zoom: 1.0,
+      scaleLimit: { min: 0.8, max: 4 },
+      itemStyle: {
+        areaColor: '#1e2030',
+        borderColor: '#2a3050',
+        borderWidth: 0.8
+      },
+      emphasis: {
+        itemStyle: {
+          areaColor: '#2a3a5c',
+          borderColor: '#3a4f7c',
+          borderWidth: 1
+        },
+        label: { show: true, color: '#e8eaed', fontSize: 11 }
+      },
+      label: { show: false },
+      data: data.map(d => ({ name: d.name, value: d.value }))
+    }]
   };
 
   chart.setOption(opt);
